@@ -4,7 +4,7 @@
 import re
 
 import mock
-
+import pytest
 from datadog_checks.upsc import UpscCheck
 
 from .common import INSTANCES
@@ -96,3 +96,29 @@ def test_check(mock_iocall, aggregator):
         aggregator.assert_metric('upsc.{}'.format(name), count=count, value=value, tags=test_tags)
 
     aggregator.assert_all_metrics_covered()
+
+
+@pytest.mark.parametrize(
+    'status, expected',
+    [
+        ('OL', 1.0),
+        ('OL CHRG', 1.0),
+        ('OL TRIM', 1.0),
+        ('OL BOOST', 1.0),
+        ('OB', 0.0),
+        ('OB DISCHRG', 0.0),
+        ('OB LB', 0.0),
+        ('RB', 0.0),
+        # `upsd` prepends FSD, and a driver can prepend ALARM, so the on-line flag is not always the first word
+        ('FSD OL', 1.0),
+        ('ALARM OL', 1.0),
+        ('FSD OB LB', 0.0),
+    ],
+)
+def test_ups_status_flags(status, expected):
+    """`ups.status` is a space separated set of flags, so the on-line flag has to be looked for in all of them."""
+    check = UpscCheck('upsc ', {}, {}, INSTANCES)
+    check.update_from_config(INSTANCES[0])
+
+    result_stats, _tags = check.convert_and_filter_stats({'ups.status': status})
+    assert {'ups.status': expected} == result_stats

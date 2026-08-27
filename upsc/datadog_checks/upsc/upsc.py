@@ -75,7 +75,10 @@ class UpscCheck(AgentCheck):
                 results[k] = value
             except Exception:  # this is a string value instead
                 if k == 'ups.status':
-                    if v.lower().startswith('ol') or v.lower().startswith('on'):
+                    # `ups.status` is a space separated set of flags and the on-line one is not always the first:
+                    # `upsd` prepends FSD while a forced shutdown is in progress and drivers can prepend ALARM, both
+                    # of which made a UPS that is still on line power report as if it were not.
+                    if any(flag.startswith(('ol', 'on')) for flag in v.lower().split()):
                         results[k] = 1.0
                     else:
                         results[k] = 0.0
